@@ -1,49 +1,53 @@
 import { Request, Response, NextFunction } from "express";
 import passport from "passport";
-import { BasicStrategy } from "passport-http";
+import dotenv from "dotenv";
+import { Strategy as JWTStrategy, ExtractJwt } from "passport-jwt";
+import jwt from "jsonwebtoken";
 import { User } from "../model/User";
 
-interface CustomError extends Error {
-  status?: number;
-}
+dotenv.config();
 
-const notAuthorizedJson = { status: 401, message: "Not authorized" };
+const notAuthenticatedJson = { status: 401, message: "Não autorizado." };
+
+const options = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET as string,
+};
 
 passport.use(
-  new BasicStrategy(async (email, password, done) => {
+  new JWTStrategy(options, async (payload, done) => {
     try {
-      if (email && password) {
-        const user = await User.findOne({
-          where: { email, password },
-        });
-        if (user) {
-          return done(null, user);
-        }
+      const user = await User.findByPk(payload.id);
+
+      if (user) {
+        return done(null, user);
+      } else {
+        return done(null, false);
       }
-      throw new Error("Not authorized");
     } catch (error) {
-      return done(error as CustomError, false);
+      return done(error, false);
     }
   })
 );
+
+export const generateToken = (data: Object) => {
+  return jwt.sign(data, process.env.JWT_SECRET as string);
+};
 
 export const privateRoute = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  passport.authenticate(
-    "basic",
-    { session: false },
-    (err: CustomError, user: any) => {
-      req.user = user;
-      if (user) {
-        return next();
-      } else {
-        return res.status(err?.status || 401).json(notAuthorizedJson);
-      }
+  passport.authenticate("jwt", { session: false }, (err: Error, user: any) => {
+    if (user) {
+      return next();
+    } else {
+      return res
+        .status(err?.message === "No auth token" ? 401 : 403)
+        .json(notAuthenticatedJson);
     }
-  )(req, res, next);
+  })(req, res, next);
 };
 
 export default passport;
