@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { User } from "../model/User";
 
+export const ping = (req: Request, res: Response) => {
+  res.json({ pong: true });
+};
+
 export const register = async (req: Request, res: Response) => {
   if (req.body.email && req.body.password) {
     let { email, password } = req.body;
