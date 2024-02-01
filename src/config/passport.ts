@@ -36,6 +36,7 @@ export const privateRoute = (
     "basic",
     { session: false },
     (err: CustomError, user: any) => {
+      req.user = user;
       if (user) {
         return next();
       } else {
